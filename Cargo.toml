@@ -1,3 +1,14 @@
 [workspace]
-members = ["entities"]
+members = [ "driver","entities"]
 resolver = "2"
+
+[workspace.dependencies]
+tokio = { version = "1.0", features = ["full"] }
+async-trait = "0.1"
+anyhow = "1.0.89"
+serde = { version = "1.0", features = ["derive"] }
+serde_repr = "0.1.19"
+serde_json = "1.0"
+uuid = { version = "1.10", features = ["serde", "v4"] }
+tracing = "0.1"
+chrono = "0.4"
