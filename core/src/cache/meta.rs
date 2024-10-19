@@ -18,5 +18,11 @@ pub struct FileDownloadSource {
     pub file_id: Uuid,
     pub provider_type: String,
     pub provider_index: String,
-    pub path: String,
+    pub object_key: String,
+}
+
+impl FileDownloadSource {
+    pub fn get_cache_uuid(&self) -> Uuid {
+        Uuid::new_v5(&Uuid::NAMESPACE_OID, serde_json::to_string(&self).unwrap().as_bytes())
+    }
 }
