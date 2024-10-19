@@ -16,6 +16,7 @@ pub struct FileMetaData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileDownloadSource {
     pub file_id: Uuid,
-    pub provider: String,
+    pub provider_type: String,
+    pub provider_index: String,
     pub path: String,
 }

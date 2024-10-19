@@ -2,13 +2,16 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use async_trait::async_trait;
 use anyhow::Result;
+use crate::FileDownloadSource;
 
 #[async_trait]
-pub trait DownloadPermitTrait<Credential: Sized>: Sized + Send + Sync {
-    async fn get_signed_url(&self, credential: &Credential, path: &str) -> Result<String>;
+/// A `LiveAccessToken` can request a signed url from the provider.
+pub trait LiveAccessToken: Sized + Send + Sync {
+    async fn get_signed_url(&self, path: &str) -> Result<String>;
 }
 
-pub trait IndexedAccount: Sized + Send + Sync {
+/// The trait for access token that can be indexed by a string.
+pub trait IndexedLiveAccessToken: LiveAccessToken {
     fn index_field(&self) -> String;
     fn match_index(&self, index: &str) -> bool {
         self.index_field() == index
@@ -18,38 +21,46 @@ pub trait IndexedAccount: Sized + Send + Sync {
     }
 }
 
-#[async_trait]
-pub trait DriverTrait<AccessToken: IndexedAccount>: DownloadPermitTrait<AccessToken>
-{
+/// A container that can store access tokens.
+pub trait AccessTokenContainer<AccessToken: IndexedLiveAccessToken> {
     fn try_get_account(&self, index: &str) -> Option<&AccessToken>;
-    fn driver_name() -> &'static str;
-    fn link_expire_seconds() -> u64;
-    async fn try_get_signed_url(&self, index: &str, path: &str) -> Result<String> {
-        let account = self.try_get_account(index).ok_or(anyhow::anyhow!("Account not found"))?;
-        self.get_signed_url(account, path).await
-    }
 }
 
-pub trait ConfigurableDriverTrait<Config, AccessToken: IndexedAccount>: DriverTrait<AccessToken>
+#[async_trait]
+pub trait DriverTrait {
+    /// All drivers will be stored in a `HashMap<String, Arc<dyn DriverTrait>>` with their identifier as the key.
+    fn identifier(&self) -> &str;
+    fn link_expire_seconds() -> u64;
+    async fn try_get_signed_url(&self, source: &FileDownloadSource) -> Result<String>;
+}
+
+#[async_trait]
+pub trait ConfigurableDriverTrait<Config>: Sized
 where Config: for<'de> serde::Deserialize<'de> + Sized
 {
-    fn from_config(config: Config) -> Result<Self>;
+    async fn from_config(config: Config) -> Result<Self>;
 }
 
-pub trait ClusterDriverTrait<Config, AccessToken: IndexedAccount>:
-ConfigurableDriverTrait<Config, AccessToken> + CombinableDriverTrait<AccessToken>
+pub trait ConfigurablePoolTrait<Config>: ConfigurableDriverTrait<Config>
 where Config: PartialEq + Eq + Hash + for<'de> serde::Deserialize<'de>
 {
     fn from_configs(config: HashSet<Config>) -> Result<Self>;
 }
 
-pub trait CombinableDriverTrait<Account: IndexedAccount>: DriverTrait<Account> {
-    fn combine_drivers(a: Self, b: Self) -> Self;
+#[async_trait]
+/// Some drivers need to refresh their access tokens.
+///
+/// This trait is for the access token itself.
+pub trait DynamicAccessToken: LiveAccessToken {
+    async fn refresh_self(&self) -> Result<Self>;
 }
 
 #[async_trait]
-pub trait DynamicAccessTokenDriver<AccessToken: IndexedAccount>: DriverTrait<AccessToken> {
-    fn access_token_expire_seconds(&self) -> u64;
-    async fn refresh_access_token(&self, old: &AccessToken) -> Result<AccessToken>;
+/// Some drivers need to refresh their access tokens.
+pub trait DynamicAccessTokenDriver: DriverTrait {
+    /// this can help manager to decide how often to refresh the access token.
+    fn access_token_expire_seconds(&self) -> &'static u64;
+
+    /// refresh all access tokens. Usually by calling [refresh_access_token](DynamicAccessToken::refresh_access_token) for each access token.
     async fn refresh_all_access_tokens(&self) -> Result<()>;
 }

@@ -5,4 +5,5 @@ mod link_cache;
 
 pub use downloadable::*;
 pub use link_cache::SignedLinkCache;
-pub use meta_data::{FileMetaData, FileDownloadSource};
+pub use meta_data::{FileDownloadSource, FileMetaData};
+
